@@ -1,4 +1,4 @@
-# Проверка репозитория на секреты перед git push (для владельца, Windows PowerShell).
+﻿# Проверка репозитория на секреты перед git push (для владельца, Windows PowerShell).
 # Нужен Docker Desktop. Запуск из D:\finmodel\code:  .\scripts\check-secrets.ps1
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $PSScriptRoot)
