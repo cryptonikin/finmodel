@@ -27,7 +27,10 @@ def test_all_found_and_request_budget():
     assert res.requests <= 4 and len(reader.calls) == res.requests == 4
     stocks = _sheet(res, "stocks")
     assert {"P/E", "EV/EBITDA", "Долг/EBITDA"} <= set(stocks.duplicates)
-    assert stocks.writers["formula"] == 2
+    # №, Действие + 6 формульных колонок §3.2; P/E и др. с occurrence: 1 — без ошибки неоднозначности
+    assert stocks.writers == {"apps_script": 12, "formula": 8, "owner": 3}
+    assert not [w for w in stocks.warnings if "writers" in w]
+    assert _sheet(res, "video_tags").writers == {"n8n": 6}
     assert _sheet(res, "journal").last_data_row == 7  # данные с 5-й, 3 строки
     assert _sheet(res, "model").status == "no_header"
 

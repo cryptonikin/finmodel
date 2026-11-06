@@ -129,13 +129,13 @@ def _check_columns(spec: SheetSpec, headers: list[str], res: SheetResult) -> Non
     res.duplicates = {name: [column_letter(i) for i in idx] for name, idx in find_duplicates(headers).items()}
 
     counts: Counter[str] = Counter()
-    for col, writer in spec.writers.items():
+    for col, w in spec.writers.items():
         try:
-            find_column(headers, col)
+            find_column(headers, col, w.occurrence)
         except (ColumnNotFound, AmbiguousColumn) as exc:
             res.warnings.append(f"writers: {exc}")
         else:
-            counts[writer] += 1
+            counts[w.writer] += 1
     res.writers = dict(sorted(counts.items()))
 
     last = last_nonempty_index(headers)

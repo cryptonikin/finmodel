@@ -4,7 +4,7 @@ import pytest
 import yaml
 
 from app.settings import REPO_ROOT
-from app.sheets.contract import ContractError, load_contract, parse_contract
+from app.sheets.contract import ContractError, WriterSpec, load_contract, parse_contract
 
 
 def base():
@@ -24,7 +24,12 @@ def test_repo_contract_is_valid():
     assert c.sheet("docker_settings").optional
     stocks = c.sheet("stocks")
     assert any(r.name == "P/E" and r.occurrence == 1 for r in stocks.required)
-    assert stocks.writers["№"] == "formula" and stocks.writers["Действие"] == "formula"
+    assert stocks.writers["№"].writer == "formula" and stocks.writers["Действие"].writer == "formula"
+    assert stocks.writers["P/E"] == WriterSpec("apps_script", 1)
+    assert c.sheet("journal").writers["ID"].writer == "formula"  # SHEETS_INTERFACE §3.3
+    assert c.sheet("video_tags").writers["ID (hash)"].writer == "n8n"
+    tags = {r.name for r in c.sheet("video_tags").required}
+    assert {"Сценарий", "Статус проверки", "Модель LLM", "Версия промта"} <= tags  # схема v3 (§4)
 
 
 def test_valid():
@@ -68,6 +73,8 @@ def test_missing_env_names_variable_not_value():
         (lambda d: d["sheets"][0].update(data_from=4), "data_from"),
         (lambda d: d["sheets"][0].pop("key"), "key"),
         (lambda d: d["sheets"][0].update(writers={"ID": "robot"}), "writers"),
+        (lambda d: d["sheets"][0].update(writers={"ID": {"writer": "owner", "x": 1}}), "writers"),
+        (lambda d: d["sheets"][0].update(writers={"ID": {"writer": "owner", "occurrence": 0}}), "writers"),
         (lambda d: d["sheets"][0].update(required=[{"name": "X", "occurrence": 0}]), "occurrence"),
         (lambda d: d["sheets"][0].update(required=[123]), "required"),
         (lambda d: d["sheets"][0].update(bogus=1), "неизвестные поля"),

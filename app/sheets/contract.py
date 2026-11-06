@@ -8,7 +8,7 @@ from pathlib import Path
 
 import yaml
 
-WRITERS = ("owner", "formula", "apps_script", "finmodel")
+WRITERS = ("owner", "formula", "apps_script", "n8n", "finmodel")
 
 
 class ContractError(Exception):
@@ -32,6 +32,12 @@ class RequiredColumn:
 
 
 @dataclass(frozen=True)
+class WriterSpec:
+    writer: str
+    occurrence: int | None = None
+
+
+@dataclass(frozen=True)
 class SheetSpec:
     alias: str
     spreadsheet: str
@@ -40,7 +46,7 @@ class SheetSpec:
     data_from: int | None = None
     key: str | None = None
     required: tuple[RequiredColumn, ...] = ()
-    writers: Mapping[str, str] = field(default_factory=dict)
+    writers: Mapping[str, WriterSpec] = field(default_factory=dict)
     optional: bool = False
     writer_future: str | None = None
 
@@ -149,15 +155,23 @@ def parse_contract(data: object) -> Contract:
         writers = raw.get("writers") or {}
         if not isinstance(writers, dict):
             raise ContractError(f"{where}.writers: ожидается словарь")
+        parsed_writers: dict[str, WriterSpec] = {}
         for col, w in writers.items():
-            if w not in WRITERS:
+            if isinstance(w, dict):
+                if set(w) - {"writer", "occurrence"}:
+                    raise ContractError(f"{where}.writers[{col}]: допустимы поля writer, occurrence")
+                spec_w = WriterSpec(w.get("writer"), _int_or_none(w.get("occurrence"), f"{where}.writers[{col}]"))
+            else:
+                spec_w = WriterSpec(w)
+            if spec_w.writer not in WRITERS:
                 raise ContractError(f"{where}.writers[{col}]: допустимо {', '.join(WRITERS)}")
+            parsed_writers[str(col)] = spec_w
         optional = raw.get("optional", False)
         if not isinstance(optional, bool):
             raise ContractError(f"{where}.optional: ожидается true/false")
         sheets.append(
             SheetSpec(alias=alias, spreadsheet=ss, title=title, header_row=header_row, data_from=data_from,
-                      key=key, required=required, writers={str(k): v for k, v in writers.items()},
+                      key=key, required=required, writers=parsed_writers,
                       optional=optional, writer_future=raw.get("writer_future"))
         )
     return Contract(version=1, spreadsheets=spreadsheets, sheets=tuple(sheets))
