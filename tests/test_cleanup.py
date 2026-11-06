@@ -42,6 +42,14 @@ def test_logs_reports_backups_by_age(ctx, fixed_now):
     assert [b.exists() for b in backups] == [True] * 10 + [False] * 2 and not old_backup.exists()
 
 
+def test_backups_keep_min_3_even_if_old(ctx, fixed_now):
+    # записей в «Журнал» не было больше месяца: все бэкапы старше 30 дней → последние 3 остаются
+    files = [touch(ctx.settings.backups_dir / f"journal_{i:02d}.json", 40 + i, fixed_now) for i in range(5)]
+    c = counts(run_cleanup(ctx))
+    assert c["бэкапы /data/backups"] == 2
+    assert [f.exists() for f in files] == [True, True, True, False, False]
+
+
 def test_report_limit_100(ctx, fixed_now):
     files = [touch(ctx.settings.reports_dir / f"check_{i:03d}.md", i / 100, fixed_now) for i in range(105)]
     run_cleanup(ctx)

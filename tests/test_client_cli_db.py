@@ -114,7 +114,7 @@ def test_db_runs(tmp_path, fixed_now):
 
 def test_cli_version_runs_check(ctx, capsys):
     assert main(["version"], ctx) == 0
-    assert "0.1.0" in capsys.readouterr().out
+    assert "0.1.1" in capsys.readouterr().out
     assert main(["runs"], ctx) == 0
     assert "ещё не было" in capsys.readouterr().out
 

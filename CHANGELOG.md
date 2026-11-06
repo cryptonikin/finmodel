@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.1.1 — 06.11.2026 — Ф0: доработки по приёмке
+
+- `cleanup`: последние 3 бэкапа (`backups.keep_min`) хранятся всегда, даже старше 30 дней.
+- Dockerfile: системная `tzdata`, `/etc/localtime` = Europe/Moscow (ротация логов в полночь МСК).
+- README: при работающем планировщике разовые команды выполняются через `docker compose exec scheduler python -m app …`.
+
 ## 0.1.0 — 06.11.2026 — Ф0: каркас (TASK_F0 v1.4)
 
 - CLI `python -m app {check|scheduler|runs|cleanup|version}`.

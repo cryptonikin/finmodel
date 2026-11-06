@@ -8,8 +8,9 @@ reports:
   max_files: 100            # больше — удаляются самые старые
   patterns: ["check_*.md", "cleanup_*.md", "tinvest_*.md"]
 backups:
-  keep_last: 10             # /data/backups: последние 10 и не старше 30 дней
+  keep_last: 10             # /data/backups: последние 10 и не старше 30 дней,
   days: 30
+  keep_min: 3               # но последние 3 — всегда, даже старше 30 дней (решение архитектора 06.11.2026)
   patterns: ["*.json"]
 tinvest_operations:
   extra_days: 14            # окно загрузки (tinvest.period_months) + 14 дней; journal_sync — вместе с операциями

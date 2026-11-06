@@ -96,7 +96,8 @@ def clean_backups(settings: Settings, now: datetime, cfg: dict[str, Any], dry_ru
     files = _files(settings.backups_dir, list(cfg.get("patterns", ["*.json"])))
     cutoff = (now - timedelta(days=int(cfg["days"]))).timestamp()
     keep_last = int(cfg["keep_last"])
-    drop = [f for i, f in enumerate(files) if i >= keep_last or f.stat().st_mtime < cutoff]
+    keep_min = min(int(cfg.get("keep_min", 3)), keep_last)  # последние keep_min — всегда, даже старше срока
+    drop = [f for i, f in enumerate(files) if i >= keep_last or (i >= keep_min and f.stat().st_mtime < cutoff)]
     return _delete(drop, settings.data_dir, dry_run)
 
 
@@ -174,7 +175,8 @@ def run_cleanup(ctx: AppContext, dry_run: bool = False) -> CleanupReport:
                                  f"старше {cfg['reports']['days']} дн или сверх {cfg['reports']['max_files']}"))
     rep.items.append(CleanupItem("бэкапы /data/backups", clean_backups(s, now, cfg["backups"], dry_run),
                                  f"кроме последних {cfg['backups']['keep_last']}"
-                                 f" не старше {cfg['backups']['days']} дн"))
+                                 f" не старше {cfg['backups']['days']} дн;"
+                                 f" последние {cfg['backups'].get('keep_min', 3)} — всегда"))
     period = period_months_from_meta(db, int(ctx.rules()["tinvest.period_months"].default))
     ops, sync = clean_operations(db, now, s.tz, period, int(cfg["tinvest_operations"]["extra_days"]), dry_run)
     rep.items.append(CleanupItem("операции брокера tinvest_operations", ops,

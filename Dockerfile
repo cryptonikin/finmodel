@@ -15,6 +15,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # RUN echo "<SHA-256>  /usr/local/share/ca-certificates/russian_trusted_root_ca.crt" | sha256sum -c - \
 #     && update-ca-certificates
 
+# Системная tzdata: время МСК для ОС (ротация логов в полночь по Москве), не только для Python.
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tzdata \
+    && ln -sf /usr/share/zoneinfo/Europe/Moscow /etc/localtime \
+    && echo "Europe/Moscow" > /etc/timezone \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
