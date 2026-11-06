@@ -45,9 +45,25 @@ from app.user_settings import (
 log = logging.getLogger(__name__)
 
 EXIT_OK, EXIT_MISSING, EXIT_ACCESS = 0, 1, 2
-EMPTY_TAIL_ROWS = 300  # §12: пустой хвост больше — предупреждение
-EXTRA_COLUMNS = 5  # §12: колонок больше, чем последняя непустая в шапке + 5 — предупреждение
 META_DOCKER_REMINDER = "check.docker_cleanup_reminded_at"
+META_SHEET_SIZES = "check.sheet_sizes"  # {alias: [строк, колонок]} последнего успешного check (код 0/1)
+
+
+@dataclass(frozen=True)
+class SizeLimits:
+    """Пороги контроля размера листов (config/retention.yaml → sheet_size)."""
+
+    empty_tail_rows: int = 2000  # страховка: пустой хвост больше — предупреждение
+    extra_columns: int = 5  # колонок больше, чем последняя непустая в шапке + N — предупреждение
+
+    @classmethod
+    def from_config(cls, cfg: dict[str, Any] | None) -> SizeLimits:
+        cfg = cfg or {}
+        try:
+            return cls(int(cfg.get("empty_tail_rows", cls.empty_tail_rows)),
+                       int(cfg.get("extra_columns", cls.extra_columns)))
+        except (TypeError, ValueError) as exc:
+            raise ConfigError(f"retention.yaml: sheet_size — не целое число ({exc})") from exc
 
 
 @dataclass
@@ -142,18 +158,40 @@ def _check_columns(spec: SheetSpec, headers: list[str], res: SheetResult) -> Non
     res.header_last_col = last + 1 if last >= 0 else 0
 
 
-def _size_check(res: SheetResult, spec: SheetSpec) -> None:
-    if res.last_data_row is not None and res.row_count - res.last_data_row > EMPTY_TAIL_ROWS:
+def _size_check(res: SheetResult, limits: SizeLimits) -> None:
+    tail = limits.empty_tail_rows
+    if res.last_data_row is not None and res.row_count - res.last_data_row > tail:
         res.warnings.append(
-            f"размер: пустой хвост {res.row_count - res.last_data_row} строк (> {EMPTY_TAIL_ROWS}): "
+            f"размер: пустой хвост {res.row_count - res.last_data_row} строк (> {tail}): "
             f"данные до {res.last_data_row}, всего {res.row_count}"
         )
-    if res.header_last_col is not None and res.column_count > res.header_last_col + EXTRA_COLUMNS:
+    extra = limits.extra_columns
+    if res.header_last_col is not None and res.column_count > res.header_last_col + extra:
         res.warnings.append(
             f"размер: колонок {res.column_count}, последняя заполненная в шапке — "
             f"{column_letter(res.header_last_col - 1) if res.header_last_col else '-'} ({res.header_last_col}) "
-            f"> +{EXTRA_COLUMNS}"
+            f"> +{extra}"
         )
+
+
+def _growth_check(res: SheetResult, previous: dict[str, list[int]] | None) -> None:
+    """Рост сетки листа относительно прошлого успешного check. Нет прошлых данных — молча."""
+    prev = (previous or {}).get(res.alias)
+    if not prev or res.status.startswith("missing"):
+        return
+    rows, cols = prev
+    grown = []
+    if res.row_count > rows:
+        grown.append(f"строк {rows} → {res.row_count} (+{res.row_count - rows})")
+    if res.column_count > cols:
+        grown.append(f"колонок {cols} → {res.column_count} (+{res.column_count - cols})")
+    if grown:
+        res.warnings.append("размер: лист вырос с прошлой проверки: " + ", ".join(grown))
+
+
+def sheet_sizes(result: CheckResult) -> dict[str, list[int]]:
+    """Размеры найденных листов — новая база для контроля роста (хранится в SQLite meta)."""
+    return {s.alias: [s.row_count, s.column_count] for s in result.sheets if not s.status.startswith("missing")}
 
 
 def run_check(
@@ -163,7 +201,11 @@ def run_check(
     *,
     rules: dict[str, SettingRule] | None = None,
     started_at: str = "",
+    limits: SizeLimits | None = None,
+    previous_sizes: dict[str, list[int]] | None = None,
 ) -> CheckResult:
+    """previous_sizes — {alias: [строк, колонок]} прошлого успешного check; None/пусто — первый запуск."""
+    limits = limits or SizeLimits()
     result = CheckResult(started_at=started_at)
     counting = _CountingReader(reader)
     settings: UserSettings | None = None
@@ -190,6 +232,7 @@ def run_check(
             res = SheetResult(spec.alias, spec.title, ss_alias, "ok" if spec.header_row else "no_header",
                               spec.optional, info.row_count, info.column_count)
             result.sheets.append(res)
+            _growth_check(res, previous_sizes)
             if spec.header_row:
                 present.append((spec, res))
 
@@ -241,8 +284,8 @@ def run_check(
             last = last_nonempty_index(col)
             res.last_data_row = (spec.data_from + last) if last >= 0 else spec.header_row
 
-        for spec, res in present:
-            _size_check(res, spec)
+        for _, res in present:
+            _size_check(res, limits)
 
     if rules is not None:
         if settings is None:
@@ -362,6 +405,18 @@ def _docker_reminder(ctx: AppContext, now: datetime, days: int) -> str | None:
             "(только висячие образы и кэш сборки, без -a и --volumes)")
 
 
+def _load_sizes(ctx: AppContext) -> dict[str, list[int]]:
+    raw = ctx.db.get_meta(META_SHEET_SIZES)
+    try:
+        data = json.loads(raw) if raw else {}
+    except ValueError:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {k: v for k, v in data.items()
+            if isinstance(v, list) and len(v) == 2 and all(isinstance(x, int) for x in v)}
+
+
 def job(ctx: AppContext, trigger: str = "manual", as_json: bool = False, out: TextIO | None = None) -> JobResult:
     now = ctx.now()
     tz = ZoneInfo(ctx.settings.tz)
@@ -372,12 +427,17 @@ def job(ctx: AppContext, trigger: str = "manual", as_json: bool = False, out: Te
         contract = ctx.contract()
         rules = ctx.rules()
         retention = ctx.retention()
+        limits = SizeLimits.from_config(retention.get("sheet_size"))
         ids = contract.resolve_ids(ctx.settings.env)
         reader = ctx.reader_factory(ctx.settings)
     except (ContractError, SettingsError, SettingsRulesError, ConfigError, SheetsAccessError) as exc:
         result = CheckResult(started_at=started, exit_code=EXIT_ACCESS, errors=[str(exc)])
     else:
-        result = run_check(contract, ids, reader, rules=rules, started_at=started)
+        previous = _load_sizes(ctx)
+        result = run_check(contract, ids, reader, rules=rules, started_at=started,
+                           limits=limits, previous_sizes=previous)
+        if result.exit_code != EXIT_ACCESS:  # таблицы прочитаны → новая база для контроля роста
+            ctx.db.set_meta(META_SHEET_SIZES, json.dumps({**previous, **sheet_sizes(result)}, ensure_ascii=False))
         result.warnings += size_warnings(ctx.settings, ctx.db, retention["limits"])
         reminder = _docker_reminder(ctx, now, int(retention.get("docker_cleanup_reminder_days", 30)))
         if reminder:
