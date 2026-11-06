@@ -1,0 +1,36 @@
+# finmodel (TASK_F0 §3, §13.2). Пути ../secrets и ../data — относительно D:\finmodel\code.
+# Разовые команды — только с --rm:   docker compose run --rm app check
+# Планировщик (включается позже):    docker compose --profile scheduler up -d
+# Портов нет: сервис только делает исходящие запросы.
+
+x-finmodel: &finmodel
+  build: .
+  image: finmodel:local
+  env_file: ../secrets/finmodel.env
+  secrets: [google_sa]
+  volumes: ["../data:/data"]
+  user: "10001:10001"
+  read_only: true
+  tmpfs: ["/tmp:size=64m"]
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  mem_limit: 512m
+  logging:
+    driver: json-file
+    options: {max-size: "10m", max-file: "3"}
+
+services:
+  app:
+    <<: *finmodel
+
+  scheduler:
+    <<: *finmodel
+    command: ["scheduler"]
+    restart: unless-stopped
+    profiles: ["scheduler"]
+
+secrets:
+  google_sa:
+    file: ../secrets/google-sa.json
+  # tinvest_token:                    # Ф1
+  #   file: ../secrets/tinvest-token.txt

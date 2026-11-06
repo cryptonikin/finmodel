@@ -1,0 +1,149 @@
+# Контракт листов (TASK_F0 §5, §10.1, §11.1). Колонки — только по заголовку, никогда по букве.
+# ID таблиц здесь НЕТ: только имена env-переменных (значения — в D:\finmodel\secrets\finmodel.env).
+#
+# Поля листа:
+#   alias, spreadsheet, title       — обязательные
+#   header_row / data_from          — строка заголовков и первая строка данных (null — лист из блоков, без шапки)
+#   key                             — ключевая колонка: конец данных = последняя непустая строка в ней
+#   required                        — обязательные колонки; строка или {name, occurrence} для повторяющихся заголовков
+#   writers                         — кто пишет колонку: owner | formula | apps_script | finmodel (Ф0: только документация)
+#   optional: true                  — отсутствие листа — предупреждение, а не ошибка
+#   writer_future                   — заметка о будущем писателе (документация)
+#
+# ВНИМАНИЕ: поля writers заполнены по тексту TASK_F0/TASK_F1; SHEETS_INTERFACE_v1.8.md при выполнении Ф0
+# отсутствовал в /workspace — сверить по его §3 (см. REPORT_F0.md).
+
+version: 1
+
+spreadsheets:
+  invest: {env: SHEET_INVEST_ID, title: "Расчет инвестиций"}
+  budget: {env: SHEET_BUDGET_ID, title: "Бюджет и инвестиции - ai"}
+
+sheets:
+  - alias: journal
+    spreadsheet: invest
+    title: "Журнал"
+    header_row: 4
+    data_from: 5
+    key: "ID"
+    writer_future: "Ф1: только новые строки в существующие пустые строки с формулами"
+    required: ["ID", "Дата", "Брокер", "Операция", "Тикер / код MOEX", "ISIN", "ID идеи", "Класс", "Кол-во",
+               "Цена (облиг. — % ном.) / сумма", "НКД", "Денежный поток, ₽", "Комиссия, ₽", "Площадка",
+               "Сделок в строке", "Источник", "Статус / примечание", "Вывод / урок"]
+    writers:
+      # вводимые колонки (владелец; в Ф1 — также finmodel для строк T-API)
+      "ID": owner
+      "Дата": owner
+      "Брокер": owner
+      "Операция": owner
+      "Тикер / код MOEX": owner
+      "Кол-во": owner
+      "Цена (облиг. — % ном.) / сумма": owner
+      "НКД": owner
+      "Комиссия, ₽": owner
+      "Источник": owner
+      "Статус / примечание": owner
+      "Вывод / урок": owner
+      # формульные колонки (TASK_F1 §7.4)
+      "ISIN": formula
+      "ID идеи": formula
+      "Класс": formula
+      "Денежный поток, ₽": formula
+      "Площадка": formula
+      "Сделок в строке": formula
+
+  - alias: stocks
+    spreadsheet: invest
+    title: "Акции"
+    header_row: 4
+    data_from: 5
+    key: "Тикер (ввод)"
+    required: ["№", "Тикер (ввод)", "Название", "Цена", "Оценка 0–100", "Тренд", "SMA50", "SMA200", "RSI14",
+               "ATR14, %", "Дивдох. 12м", "В портфеле",
+               {name: "P/E", occurrence: 1}, {name: "EV/EBITDA", occurrence: 1},
+               {name: "Долг/EBITDA", occurrence: 1}]   # повторяются во 2-м блоке (баллы) — берём первый (значения ФА)
+    writers:
+      "№": formula                      # изм. 22.10: только формулы
+      "Действие": formula               # изм. 22.10: только формулы
+      "Тикер (ввод)": owner
+      "Дата добавления / смены действия (авто)": apps_script   # колонка E, изм. 06.11
+      "Цена": apps_script               # ТА (moex_sync)
+      "Тренд": apps_script
+      "SMA50": apps_script
+      "SMA200": apps_script
+      "RSI14": apps_script
+      "ATR14, %": apps_script
+      "Дивдох. 12м": apps_script        # ФА
+
+  - alias: bonds
+    spreadsheet: invest
+    title: "Облигации"
+    header_row: 4
+    data_from: 5
+    key: "ID (авто)"
+    required: ["ID (авто)", "Выпуск — ввод", "YTM (Справочник)", "Купон: фикс / флоатер (MOEX)",
+               "Дюрация, лет (Справочник)", "Код MOEX (авто)", "ISIN (Справочник)"]
+
+  - alias: ideas
+    spreadsheet: invest
+    title: "Идеи"
+    header_row: 4
+    data_from: 5
+    key: "ID (авто)"
+    required: ["ID (авто)", "Инструмент — ввод", "Статус (авто)", "Дата идеи", "Цель", "Стоп", "Горизонт, мес",
+               "Тикер (авто)", "Версия (авто)"]
+
+  - alias: reference
+    spreadsheet: invest
+    title: "Справочник"
+    header_row: 3
+    data_from: 4
+    key: "Тикер (как в листах)"
+    required: ["Тикер (как в листах)", "SECID MOEX", "ISIN", "Название", "Тип", "Класс модели",
+               "MOEX engine", "MOEX market", "MOEX board", "Цена (акции — ₽, облигации — % ном.)", "Цена обновлена"]
+    writers:
+      "Тикер (как в листах)": owner     # строка ищется по тикеру (A)
+      "SECID MOEX": apps_script
+      "ISIN": apps_script
+      "Название": apps_script
+      "Тип": apps_script
+      "MOEX engine": apps_script
+      "MOEX market": apps_script
+      "MOEX board": apps_script
+      "Цена (акции — ₽, облигации — % ном.)": apps_script
+      "Цена обновлена": apps_script
+
+  - alias: candidates
+    spreadsheet: invest
+    title: "Кандидаты в идеи"
+    header_row: 4
+    data_from: 5
+    key: "Тикер / ISIN"
+    required: ["✔ В идеи", "✖ Отклонить", "Дата", "Тикер / ISIN", "Балл 0–100", "Статус"]
+
+  - alias: video_tags
+    spreadsheet: invest
+    title: "Теги_видео"
+    header_row: 1
+    data_from: 2
+    key: "ID (hash)"
+    required: ["ID (hash)", "Дата видео", "Автор / канал", "Ссылка", "Тип", "Класс",
+               "Тикер (по Справочнику)", "Тональность (−2…+2)", "Тезис"]
+
+  - alias: docker_settings
+    spreadsheet: invest
+    title: "Docker: настройки"
+    header_row: 1
+    data_from: 2
+    key: "Параметр"
+    optional: true                       # лист создаст архитектор после приёмки Ф0
+    required: ["Параметр", "Значение", "Описание", "Допустимые значения"]
+    writers:
+      "Параметр": owner
+      "Значение": owner
+      "Описание": owner
+      "Допустимые значения": owner
+
+  - {alias: model, spreadsheet: invest, title: "Модель доходности", header_row: null}   # блоки, без шапки
+  - {alias: scoring, spreadsheet: invest, title: "Скоринг", header_row: null}
+  - {alias: budget_m, spreadsheet: budget, title: "10.26 вар.3", header_row: null}

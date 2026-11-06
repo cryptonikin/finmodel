@@ -1,0 +1,9 @@
+# Расписание задач (TASK_F0 §6, §13.1). Время — Москва.
+# catch_up: true — если ноутбук был выключен и слот пропущен, задача выполнится ОДИН раз при старте.
+# Время задачи можно переопределить строкой «schedule.<задача>» в листе «Docker: настройки»
+# (только для ключей, описанных в settings_defaults.yaml).
+timezone: Europe/Moscow
+jobs:
+  check:   {at: ["07:30"], days: daily, catch_up: true}
+  cleanup: {at: ["21:45"], days: daily, catch_up: true}
+  # tinvest_import: {at: ["21:30"], days: daily, catch_up: true}   # Ф1

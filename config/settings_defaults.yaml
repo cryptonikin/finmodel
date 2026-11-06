@@ -1,0 +1,21 @@
+# Настройки владельца (TASK_F0 §10.1, §14): значения по умолчанию и правила проверки.
+# Источник значений — лист «Docker: настройки» (только чтение). Нет листа/строки/неверное значение → значение отсюда.
+# Новые ключи в лист — только по решению владельца. Технические параметры — НЕ здесь, а в остальных config/*.yaml.
+enabled.tinvest_import:
+  type: bool
+  default: false
+  description: "импорт операций Т-Банка (Ф1)"
+tinvest.period_months:
+  type: int
+  default: 3
+  min: 1
+  max: 3
+  description: "период импорта по умолчанию, мес"
+write.dry_run:
+  type: bool
+  default: true
+  description: "режим «только показать» для записей"
+schedule.tinvest_import:
+  type: time
+  default: "21:30"
+  description: "время импорта Т-Банка (МСК)"

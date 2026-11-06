@@ -1,0 +1,42 @@
+# --- секреты (никогда в git) ---
+.env
+.env.*
+!.env.example
+/*.json
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+google-*.json
+*credentials*
+*token*.txt
+
+# --- данные ---
+data/
+*.db
+*.db-journal
+*.sqlite*
+reports/
+logs/
+backups/
+
+# --- окружение и кэши ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# --- ОС/редакторы ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

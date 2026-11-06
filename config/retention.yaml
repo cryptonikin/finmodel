@@ -1,0 +1,25 @@
+# Сроки хранения локальных данных (TASK_F0 §13). Всё — только внутри /data.
+logs:
+  days: 30                  # /data/logs: ротация по суткам + удаление старше срока
+job_runs:
+  days: 90                  # SQLite job_runs
+reports:
+  days: 30                  # /data/reports
+  max_files: 100            # больше — удаляются самые старые
+  patterns: ["check_*.md", "cleanup_*.md", "tinvest_*.md"]
+backups:
+  keep_last: 10             # /data/backups: последние 10 и не старше 30 дней
+  days: 30
+  patterns: ["*.json"]
+tinvest_operations:
+  extra_days: 14            # окно загрузки (tinvest.period_months) + 14 дней; journal_sync — вместе с операциями
+instruments_cache:
+  unused_days: 90
+vacuum:
+  freed_ratio: 0.10         # VACUUM, если освобождено > 10% файла БД
+  every_days: 30            # или раз в 30 дней
+limits:                     # предупреждения в логе и отчёте check
+  db_mb: 200
+  data_mb: 1024
+  logs_per_day_mb: 20
+docker_cleanup_reminder_days: 30   # строка-напоминание про scripts/docker-cleanup.ps1 в отчёте check
