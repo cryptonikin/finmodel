@@ -125,6 +125,7 @@ def test_parse_schedule_errors(data):
 def test_repo_schedule_loads(ctx):
     sch = Scheduler(ctx)
     assert set(sch.base.jobs) == {"check", "cleanup"}
+    assert sch.base.jobs["check"].at == (time(12, 30),)  # окно между запусками Apps Script в 12 и 13 ч
     ctx.db.set_meta("user_settings.values", '{"schedule.cleanup": "22:00"}')
     assert sch.schedule().jobs["cleanup"].at == (time(22, 0),)
     ctx.db.set_meta("user_settings.values", "не json")

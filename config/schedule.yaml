@@ -4,6 +4,7 @@
 # (только для ключей, описанных в settings_defaults.yaml).
 timezone: Europe/Moscow
 jobs:
-  check:   {at: ["07:30"], days: daily, catch_up: true}
+  # 12:30 — окно между запусками Apps Script в 12:00 (автоидеи, вс) и 13:00 (updatePrices) (решение 06.11.2026)
+  check:   {at: ["12:30"], days: daily, catch_up: true}
   cleanup: {at: ["21:45"], days: daily, catch_up: true}
   # tinvest_import: {at: ["21:30"], days: daily, catch_up: true}   # Ф1
